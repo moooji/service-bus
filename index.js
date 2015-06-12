@@ -57,22 +57,20 @@ function serviceBus(options) {
 
         _isPolling = true;
 
-        var options = {
+        var params = {
             QueueUrl: _subQueueUrl,
             MaxNumberOfMessages: 10,
             VisibilityTimeout: 60,
             WaitTimeSeconds: 20
         };
 
-        receiveMessagesAsync(options)
+        receiveMessagesAsync(params)
             .then(function(data) {
 
                 _isPolling = false;
 
                 if (data.Messages) {
-                    _subDelegate(data.Messages, function() {
-                        next();
-                    });
+                    _subDelegate(data.Messages, next);
                 }
                 else {
                     next();
