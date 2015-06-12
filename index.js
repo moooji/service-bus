@@ -1,47 +1,64 @@
 var Promise = require("bluebird");
 var AWS = require('aws-sdk');
 
-function serviceBus(onMessages, options) {
+function serviceBus(options) {
 
     validateOptions(options);
 
-    var isPolling = false;
-    var requestQueueUrl = options.requestQueueUrl;
-    var responseQueueUrl = options.responseQueueUrl;
+    var _isPolling = false;
+    var _pubQueueUrl = options.pubQueueUrl;
+    var _subQueueUrl = options.subQueueUrl;
+    var _subDelegate;
 
-    var sqs = new AWS.SQS({
+    var _sqs = new AWS.SQS({
         accessKeyId: options.accessKeyId,
         secretAccessKey: options.secretAccessKey,
         region: options.region
     });
 
-    var receiveMessagesAsync = Promise.promisify(sqs.receiveMessage, sqs);
-    var deleteMessageAsync = Promise.promisify(sqs.deleteMessage, sqs);
-    var sendMessageAsync = Promise.promisify(sqs.sendMessage, sqs);
+    var receiveMessagesAsync = Promise.promisify(_sqs.receiveMessage, _sqs);
+    var deleteMessageAsync = Promise.promisify(_sqs.deleteMessage, _sqs);
+    var sendMessageAsync = Promise.promisify(_sqs.sendMessage, _sqs);
 
-    function acknowledgeMessage(message, callback) {
+    function acknowledge(message, callback) {
 
         return deleteMessageAsync({
-            QueueUrl: responseQueueUrl,
+            QueueUrl: _subQueueUrl,
             ReceiptHandle: message.ReceiptHandle
         }).nodeify(callback);
     }
 
-    function sendMessage(body, callback) {
-        
+    function publish(body, callback) {
+
         return sendMessageAsync({
-            QueueUrl: requestQueueUrl,
+            QueueUrl: _pubQueueUrl,
             MessageBody: JSON.stringify(body),
             DelaySeconds: 0
         }).nodeify(callback);
     }
 
-    function pollMessages() {
+    function subscribe(subDelegate, callback) {
 
-        isPolling = true;
+        return new Promise(function(resolve, reject) {
+
+            if (!subDelegate || typeof subDelegate !== "function") {
+                return reject(new Error("No subDelegate function provided"));
+            }
+
+            _subDelegate = subDelegate;
+            next();
+
+            return resolve();
+
+        }).nodeify(callback);
+    }
+
+    function poll() {
+
+        _isPolling = true;
 
         var options = {
-            QueueUrl: responseQueueUrl,
+            QueueUrl: _subQueueUrl,
             MaxNumberOfMessages: 10,
             VisibilityTimeout: 60,
             WaitTimeSeconds: 20
@@ -50,10 +67,10 @@ function serviceBus(onMessages, options) {
         receiveMessagesAsync(options)
             .then(function(data) {
 
-                isPolling = false;
+                _isPolling = false;
 
                 if (data.Messages) {
-                    onMessages(data.Messages, function() {
+                    _subDelegate(data.Messages, function() {
                         next();
                     });
                 }
@@ -66,15 +83,15 @@ function serviceBus(onMessages, options) {
                 console.log(err);
                 console.log("Retry in 10");
 
-                isPolling = false;
+                _isPolling = false;
                 setTimeout(next, 10000);
             });
     }
 
     function next() {
 
-        if(isPolling) return;
-        pollMessages();
+        if(_isPolling) return;
+        poll();
     }
 
     function validateOptions(options) {
@@ -91,18 +108,19 @@ function serviceBus(onMessages, options) {
             throw Error("No AWS 'region' provided");
         }
 
-        if(!options.requestQueueUrl) {
-            throw Error("No AWS SQS 'requestQueueUrl' provided");
+        if(!options.pubQueueUrl) {
+            throw Error("No AWS SQS 'pubQueueUrl' provided");
         }
 
-        if(!options.responseQueueUrl) {
-            throw Error("No AWS SQS 'responseQueueUrl' provided");
+        if(!options.subQueueUrl) {
+            throw Error("No AWS SQS 'subQueueUrl' provided");
         }
     }
 
     return {
-        send: sendMessage,
-        acknowledge: acknowledgeMessage
+        publish: publish,
+        subscribe: subscribe,
+        acknowledge: acknowledge
     };
 }
 

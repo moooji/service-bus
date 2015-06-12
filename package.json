@@ -1,6 +1,8 @@
 {
   "name": "service-bus",
-  "version": "0.10.0",
+  "version": "0.10.3",
+  "description": "Just another service bus based on Amazon SQS.",
+  "keywords": ["servicebus", "service-bus", "SQS", "AWS"],
   "url": "https://github.com/moooji/service-bus",
   "email": "info@moooji.com",
   "repository": {
@@ -10,8 +12,5 @@
   "dependencies": {
     "aws-sdk": "^2.1.32",
     "bluebird": "^2.9.26"
-  },
-  "scripts": {
-    "start": "node server.js"
   }
 }
