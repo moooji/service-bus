@@ -1,10 +1,25 @@
 {
   "name": "service-bus",
-  "version": "0.10.5",
+  "version": "0.10.7",
   "description": "Just another service bus based on Amazon SQS.",
-  "keywords": ["servicebus", "service-bus", "SQS", "AWS"],
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "servicebus",
+    "service-bus",
+    "SQS",
+    "AWS",
+    "Amazon"
+  ],
   "url": "https://github.com/moooji/service-bus",
   "email": "info@moooji.com",
+  "author": "Steffen Strätz",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/moooji/service-bus/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/moooji/service-bus.git"
