@@ -1,10 +1,14 @@
 {
   "name": "service-bus",
-  "version": "0.10.8",
+  "version": "0.10.11",
   "description": "Just another service bus based on Amazon SQS.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --harmony index.js"
+  },
+  "engines": {
+    "node": ">=0.12.4"
   },
   "keywords": [
     "servicebus",

@@ -7,20 +7,21 @@ function serviceBus(options) {
 
     validateOptions(options);
 
-    var _isPolling = false;
-    var _pubQueueUrl = options.pubQueueUrl;
-    var _subQueueUrl = options.subQueueUrl;
-    var _subDelegate;
+    let _isPolling = false;
+    let _subDelegate;
 
-    var _sqs = new AWS.SQS({
+    const _pubQueueUrl = options.pubQueueUrl;
+    const _subQueueUrl = options.subQueueUrl;
+
+    const _sqs = new AWS.SQS({
         accessKeyId: options.accessKeyId,
         secretAccessKey: options.secretAccessKey,
         region: options.region
     });
 
-    var receiveMessagesAsync = Promise.promisify(_sqs.receiveMessage, _sqs);
-    var deleteMessageAsync = Promise.promisify(_sqs.deleteMessage, _sqs);
-    var sendMessageAsync = Promise.promisify(_sqs.sendMessage, _sqs);
+    const receiveMessagesAsync = Promise.promisify(_sqs.receiveMessage, _sqs);
+    const deleteMessageAsync = Promise.promisify(_sqs.deleteMessage, _sqs);
+    const sendMessageAsync = Promise.promisify(_sqs.sendMessage, _sqs);
 
     function acknowledge(message, callback) {
 
@@ -59,7 +60,7 @@ function serviceBus(options) {
 
         _isPolling = true;
 
-        var params = {
+        const params = {
             QueueUrl: _subQueueUrl,
             MaxNumberOfMessages: 10,
             VisibilityTimeout: 60,
