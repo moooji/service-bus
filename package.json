@@ -30,6 +30,6 @@
   },
   "dependencies": {
     "aws-sdk": "^2.1.32",
-    "bluebird": "^2.9.27"
+    "bluebird": "^2.9.30"
   }
 }
