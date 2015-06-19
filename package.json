@@ -1,6 +1,6 @@
 {
   "name": "service-bus",
-  "version": "0.10.15",
+  "version": "0.10.18",
   "description": "Just another service bus based on Amazon SQS.",
   "main": "main.js",
   "scripts": {

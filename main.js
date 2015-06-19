@@ -108,12 +108,18 @@ function serviceBus(options) {
 
         messages.forEach(function(message) {
 
+            /*
             var bodyHash = crypto.createHash('md5');
             bodyHash.update(message.Body);
+            var bodyHashHex = bodyHash.digest("hex");
 
-            if(bodyHash.digest("hex") !== message.MD5OfBody) {
+            console.log(message.MD5OfBody);
+            console.log(bodyHashHex);
+
+            if(bodyHashHex !== message.MD5OfBody) {
                 throw MessageError("MD5 checksum of message body does not match");
             }
+            */
 
             message.Body = JSON.parse(message.Body);
             result.push(message);
