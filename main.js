@@ -33,7 +33,7 @@ function serviceBus(options) {
 
         return deleteMessageAsync({
             QueueUrl: _subQueueUrl,
-            ReceiptHandle: message.ReceiptHandle
+            ReceiptHandle: message.receiptHandle
         }).nodeify(callback);
     }
 
@@ -121,8 +121,11 @@ function serviceBus(options) {
             }
             */
 
-            message.Body = JSON.parse(message.Body);
-            result.push(message);
+            result.push({
+                messageId: message.MessageId,
+                receiptHandle: message.ReceiptHandle,
+                body: JSON.parse(message.Body)
+            });
         });
 
         return result;
