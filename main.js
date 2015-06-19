@@ -2,8 +2,9 @@
 
 var crypto = require("crypto");
 var Promise = require("bluebird");
-var AWS = require('aws-sdk');
-var createError = require('custom-error-generator');
+var AWS = require("aws-sdk");
+var createError = require("custom-error-generator");
+var _ = require("lodash");
 
 var MessageError = createError('MessageError');
 var InvalidArgumentError = createError('InvalidArgumentError');
@@ -37,13 +38,28 @@ function serviceBus(options) {
         }).nodeify(callback);
     }
 
-    function publish(body, callback) {
+    function publish(data, callback) {
 
-        return sendMessageAsync({
-            QueueUrl: _pubQueueUrl,
-            MessageBody: JSON.stringify(body),
-            DelaySeconds: 0
-        }).nodeify(callback);
+        if(_.isArray(data)) {
+
+            return Promise.resolve(data)
+                .map(publish)
+                .nodeify(callback);
+        }
+        else {
+
+            return sendMessageAsync({
+                QueueUrl: _pubQueueUrl,
+                MessageBody: JSON.stringify(data),
+                DelaySeconds: 0
+            })
+              .then(function(message) {
+
+                  // TODO: ADD MD5 check
+                  return message.MessageId;
+              })
+              .nodeify(callback);
+        }
     }
 
     function subscribe(subDelegate, callback) {
