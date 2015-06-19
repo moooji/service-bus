@@ -1,7 +1,13 @@
 "use strict";
 
+var crypto = require("crypto");
 var Promise = require("bluebird");
 var AWS = require('aws-sdk');
+var createError = require('custom-error-generator');
+
+var MessageError = createError('MessageError');
+var InvalidArgumentError = createError('InvalidArgumentError');
+
 
 function serviceBus(options) {
 
@@ -73,7 +79,8 @@ function serviceBus(options) {
                 _isPolling = false;
 
                 if (data.Messages) {
-                    _subDelegate(data.Messages, next);
+                    var messages = parseMessages(data.Messages);
+                    _subDelegate(messages, next);
                 }
                 else {
                     next();
@@ -91,37 +98,59 @@ function serviceBus(options) {
 
     function next() {
 
-        if(_isPolling) return;
+        if (_isPolling) return;
         poll();
+    }
+
+    function parseMessages(messages) {
+
+        var result = [];
+
+        messages.forEach(function(message) {
+
+            var bodyHash = crypto.createHash('md5');
+            bodyHash.update(message.Body);
+
+            if(bodyHash.digest("hex") !== message.MD5OfBody) {
+                throw MessageError("MD5 checksum of message body does not match");
+            }
+
+            message.Body = JSON.parse(message.Body);
+            result.push(message);
+        });
+
+        return result;
     }
 
     function validateOptions(options) {
 
-        if(!options.accessKeyId) {
-            throw Error("No AWS 'accessKeyId' provided");
+        if (!options.accessKeyId) {
+            throw InvalidArgumentError("No AWS 'accessKeyId' provided");
         }
 
-        if(!options.secretAccessKey) {
-            throw Error("No AWS 'secretAccessKey' provided");
+        if (!options.secretAccessKey) {
+            throw InvalidArgumentError("No AWS 'secretAccessKey' provided");
         }
 
-        if(!options.region) {
-            throw Error("No AWS 'region' provided");
+        if (!options.region) {
+            throw InvalidArgumentError("No AWS 'region' provided");
         }
 
-        if(!options.pubQueueUrl) {
-            throw Error("No AWS SQS 'pubQueueUrl' provided");
+        if (!options.pubQueueUrl) {
+            throw InvalidArgumentError("No AWS SQS 'pubQueueUrl' provided");
         }
 
-        if(!options.subQueueUrl) {
-            throw Error("No AWS SQS 'subQueueUrl' provided");
+        if (!options.subQueueUrl) {
+            throw InvalidArgumentError("No AWS SQS 'subQueueUrl' provided");
         }
     }
 
     return {
         publish: publish,
         subscribe: subscribe,
-        acknowledge: acknowledge
+        acknowledge: acknowledge,
+        InvalidArgumentError: InvalidArgumentError,
+        MessageError: MessageError
     };
 }
 

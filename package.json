@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "aws-sdk": "^2.1.32",
-    "bluebird": "^2.9.30"
+    "bluebird": "^2.9.30",
+    "custom-error-generator": "^7.0.0"
   }
 }
