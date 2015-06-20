@@ -70,18 +70,16 @@ function serviceBus(options) {
 
     function poll() {
 
-        console.log("%d poll %s", process.pid, _isPolling);
         _isPolling = true;
 
         var params = {
             QueueUrl: _subQueueUrl,
             MaxNumberOfMessages: 10,
             VisibilityTimeout: 60,
-            WaitTimeSeconds: 20
+            WaitTimeSeconds: 10
         };
 
         receiveMessagesAsync(params)
-            .timeout(30000)
             .then(function(data) {
 
                 _isPolling = false;
@@ -94,25 +92,15 @@ function serviceBus(options) {
                     next();
                 }
             })
-            .catch(TimeoutError, function(err) {
-
-              console.log("Promise timed out");
-              _isPolling = false;
-              next();
-
-            })
             .catch(function(err) {
 
-                console.log(err);
                 _isPolling = false;
-                setTimeout(next, 10000);
-
+                throw err;
             });
     }
 
     function next() {
 
-        console.log("%d next %s", process.pid, _isPolling);
         if (_isPolling) return;
         poll();
     }
