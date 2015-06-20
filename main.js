@@ -40,26 +40,17 @@ function serviceBus(options) {
 
     function publish(data, callback) {
 
-        if(_.isArray(data)) {
+        return sendMessageAsync({
+            QueueUrl: _pubQueueUrl,
+            MessageBody: JSON.stringify(data),
+            DelaySeconds: 0
+        })
+          .then(function(message) {
 
-            return Promise.resolve(data)
-                .map(publish)
-                .nodeify(callback);
-        }
-        else {
-
-            return sendMessageAsync({
-                QueueUrl: _pubQueueUrl,
-                MessageBody: JSON.stringify(data),
-                DelaySeconds: 0
-            })
-              .then(function(message) {
-
-                  // TODO: ADD MD5 check
-                  return message.MessageId;
-              })
-              .nodeify(callback);
-        }
+              // TODO: ADD MD5 check
+              return message.MessageId;
+          })
+          .nodeify(callback);
     }
 
     function subscribe(subDelegate, callback) {
@@ -80,6 +71,7 @@ function serviceBus(options) {
 
     function poll() {
 
+        console.log("poll %s", _isPolling);
         _isPolling = true;
 
         var params = {
@@ -114,6 +106,7 @@ function serviceBus(options) {
 
     function next() {
 
+        console.log("next %s", _isPolling);
         if (_isPolling) return;
         poll();
     }
