@@ -9,7 +9,6 @@ var _ = require("lodash");
 var MessageError = createError('MessageError');
 var InvalidArgumentError = createError('InvalidArgumentError');
 
-
 function serviceBus(options) {
 
     validateOptions(options);
@@ -71,7 +70,7 @@ function serviceBus(options) {
 
     function poll() {
 
-        console.log("poll %s", _isPolling);
+        console.log("%d poll %s", process.pid, _isPolling);
         _isPolling = true;
 
         var params = {
@@ -82,11 +81,12 @@ function serviceBus(options) {
         };
 
         receiveMessagesAsync(params)
+            .timeout(30000)
             .then(function(data) {
 
                 _isPolling = false;
 
-                if (data.Messages) {
+                if (data && data.Messages) {
                     var messages = parseMessages(data.Messages);
                     _subDelegate(messages, next);
                 }
@@ -94,19 +94,25 @@ function serviceBus(options) {
                     next();
                 }
             })
+            .catch(TimeoutError, function(err) {
+
+              console.log("Promise timed out");
+              _isPolling = false;
+              next();
+
+            })
             .catch(function(err) {
 
                 console.log(err);
-                console.log("Retry in 10");
-
                 _isPolling = false;
                 setTimeout(next, 10000);
+
             });
     }
 
     function next() {
 
-        console.log("next %s", _isPolling);
+        console.log("%d next %s", process.pid, _isPolling);
         if (_isPolling) return;
         poll();
     }
