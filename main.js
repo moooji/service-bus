@@ -1,6 +1,7 @@
 "use strict";
 
 var crypto = require("crypto");
+var zlib = require("zlib");
 var Promise = require("bluebird");
 var AWS = require("aws-sdk");
 var createError = require("custom-error-generator");
@@ -39,22 +40,73 @@ function serviceBus(options) {
 
     function publish(data, callback) {
 
-        return sendMessageAsync({
-            QueueUrl: _pubQueueUrl,
-            MessageBody: JSON.stringify(data),
-            DelaySeconds: 0
-        })
-          .then(function(message) {
+        return zipMessageBody(data)
+            .then(function (body) {
 
-              // TODO: ADD MD5 check
-              return message.MessageId;
-          })
-          .nodeify(callback);
+                return sendMessageAsync({
+                    QueueUrl: _pubQueueUrl,
+                    MessageBody: body,
+                    DelaySeconds: 0
+                });
+            })
+            .then(function (message) {
+
+                // TODO: ADD MD5 check
+                return message.MessageId;
+            })
+            .nodeify(callback);
+    }
+
+    function zipMessageBody(data, callback) {
+
+        return new Promise(function (resolve, reject) {
+
+            try {
+                var bodyString = JSON.stringify(data);
+                var bodyBuffer = new Buffer(bodyString);
+
+                zlib.inflate(bodyBuffer, function (err, res) {
+
+                    if (err) {
+                        return reject(err);
+                    }
+
+                    var zippedBody = res.toString();
+                    return resolve(zippedBody);
+                });
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }).nodeify(callback);
+    }
+
+    function unzipMessageBody(zippedBody, callback) {
+
+        return new Promise(function (resolve, reject) {
+
+            var bodyBuffer = new Buffer(zippedBody);
+            zlib.deflate(bodyBuffer, function (err, res) {
+
+                if (err) {
+                    return reject(err);
+                }
+
+                try {
+                    var bodyString = res.toString();
+                    var data = JSON.parse(bodyString);
+                    return resolve(data);
+                }
+                catch (err) {
+                    return reject(err);
+                }
+            });
+        }).nodeify(callback);
     }
 
     function subscribe(subDelegate, callback) {
 
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
 
             if (!subDelegate || typeof subDelegate !== "function") {
                 return reject(new Error("No subDelegate function provided"));
@@ -80,19 +132,24 @@ function serviceBus(options) {
         };
 
         receiveMessagesAsync(params)
-            .then(function(data) {
+            .then(function (data) {
 
                 _isPolling = false;
 
                 if (data && data.Messages) {
-                    var messages = parseMessages(data.Messages);
-                    _subDelegate(messages, next);
+                    //var messages = parseMessages(data.Messages);
+                    //_subDelegate(messages, next);
+
+                    return parseMessages(data.Messages)
+                        .then(function(messages) {
+                           _subDelegate(messages, next);
+                        });
                 }
                 else {
                     next();
                 }
             })
-            .catch(function(err) {
+            .catch(function (err) {
 
                 _isPolling = false;
                 throw err;
@@ -105,33 +162,22 @@ function serviceBus(options) {
         poll();
     }
 
-    function parseMessages(messages) {
+    function parseMessages(messages, callback) {
 
-        var result = [];
+        return Promise.resolve(messages)
+            .map(function(message) {
 
-        messages.forEach(function(message) {
+                return unzipMessageBody(message.Body)
+                    .then(function(body) {
 
-            /*
-            var bodyHash = crypto.createHash('md5');
-            bodyHash.update(message.Body);
-            var bodyHashHex = bodyHash.digest("hex");
+                        return {
+                            messageId: message.MessageId,
+                            receiptHandle: message.ReceiptHandle,
+                            body: body
+                        }
+                    });
 
-            console.log(message.MD5OfBody);
-            console.log(bodyHashHex);
-
-            if(bodyHashHex !== message.MD5OfBody) {
-                throw MessageError("MD5 checksum of message body does not match");
-            }
-            */
-
-            result.push({
-                messageId: message.MessageId,
-                receiptHandle: message.ReceiptHandle,
-                body: JSON.parse(message.Body)
-            });
-        });
-
-        return result;
+            }).nodeify(callback);
     }
 
     function validateOptions(options) {
