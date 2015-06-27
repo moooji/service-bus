@@ -1,11 +1,11 @@
-var ServiceBus = require("service-bus");
+var ServiceBus = require("../main");
 
 var sb = ServiceBus({
-    accessKeyId: "...",
-    secretAccessKey: "...",
-    region: "eu-central-1",
-    pubQueueUrl: "https://sqs.eu-central-1.amazonaws.com/...",
-    subQueueUrl: "https://sqs.eu-central-1.amazonaws.com/..."
+    accessKeyId: process.env["AWS_ACCESS_KEY_ID"],
+    secretAccessKey: process.env["AWS_SECRET_ACCESS_KEY"],
+    region: process.env["AWS_SQS_REGION"],
+    pubQueueUrl: process.env["AWS_SQS_PUB_QUEUE_URL"],
+    subQueueUrl: process.env["AWS_SQS_SUB_QUEUE_URL"]
 });
 
 sb.subscribe(onMessages, function(err, res){
@@ -17,7 +17,7 @@ function onMessages(messages, done) {
 
     messages.forEach(function(message) {
 
-        console.log(message.MessageId);
+        console.log(message);
 
         sb.acknowledge(message)
             .then(function() {

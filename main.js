@@ -40,68 +40,27 @@ function serviceBus(options) {
 
     function publish(data, callback) {
 
-        return zipMessageBody(data)
-            .then(function (body) {
+        return zipData(data)
+            .then(function (zippedData) {
 
                 return sendMessageAsync({
                     QueueUrl: _pubQueueUrl,
-                    MessageBody: body,
-                    DelaySeconds: 0
+                    MessageBody: "gzip",
+                    DelaySeconds: 0,
+                    MessageAttributes: {
+                        data: {
+                            DataType: "Binary",
+                            BinaryValue: zippedData
+                        }
+                    }
                 });
             })
             .then(function (message) {
 
                 // TODO: ADD MD5 check
-                return message.MessageId;
+                return message;
             })
             .nodeify(callback);
-    }
-
-    function zipMessageBody(data, callback) {
-
-        return new Promise(function (resolve, reject) {
-
-            try {
-                var bodyString = JSON.stringify(data);
-                var bodyBuffer = new Buffer(bodyString);
-
-                zlib.inflate(bodyBuffer, function (err, res) {
-
-                    if (err) {
-                        return reject(err);
-                    }
-
-                    var zippedBody = res.toString();
-                    return resolve(zippedBody);
-                });
-            }
-            catch (err) {
-                return reject(err);
-            }
-        }).nodeify(callback);
-    }
-
-    function unzipMessageBody(zippedBody, callback) {
-
-        return new Promise(function (resolve, reject) {
-
-            var bodyBuffer = new Buffer(zippedBody);
-            zlib.deflate(bodyBuffer, function (err, res) {
-
-                if (err) {
-                    return reject(err);
-                }
-
-                try {
-                    var bodyString = res.toString();
-                    var data = JSON.parse(bodyString);
-                    return resolve(data);
-                }
-                catch (err) {
-                    return reject(err);
-                }
-            });
-        }).nodeify(callback);
     }
 
     function subscribe(subDelegate, callback) {
@@ -128,7 +87,8 @@ function serviceBus(options) {
             QueueUrl: _subQueueUrl,
             MaxNumberOfMessages: 10,
             VisibilityTimeout: 60,
-            WaitTimeSeconds: 10
+            WaitTimeSeconds: 10,
+            MessageAttributeNames: ["data"]
         };
 
         receiveMessagesAsync(params)
@@ -158,6 +118,7 @@ function serviceBus(options) {
 
     function next() {
 
+        console.log("next %s", _isPolling);
         if (_isPolling) return;
         poll();
     }
@@ -167,7 +128,18 @@ function serviceBus(options) {
         return Promise.resolve(messages)
             .map(function(message) {
 
-                return unzipMessageBody(message.Body)
+                return Promise.resolve(message)
+                    .then(function(message) {
+
+                        if (!message.MessageAttributes ||
+                            !message.MessageAttributes.data ||
+                            !message.MessageAttributes.data.BinaryValue) {
+
+                            throw MessageError("Message has invalid payload");
+                        }
+
+                        return unzipData(message.MessageAttributes.data.BinaryValue);
+                    })
                     .then(function(body) {
 
                         return {
@@ -178,6 +150,50 @@ function serviceBus(options) {
                     });
 
             }).nodeify(callback);
+    }
+
+    function zipData(data, callback) {
+
+        return new Promise(function (resolve, reject) {
+
+            try {
+                var dataString = JSON.stringify(data);
+                var dataBuffer = new Buffer(dataString);
+
+                zlib.gzip(dataBuffer, function (err, res) {
+
+                    if (err) {
+                        return reject(err);
+                    }
+
+                    return resolve(res);
+                });
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }).nodeify(callback);
+    }
+
+    function unzipData(zippedData, callback) {
+
+        return new Promise(function (resolve, reject) {
+
+            zlib.gunzip(zippedData, function (err, res) {
+
+                if (err) {
+                    return reject(err);
+                }
+
+                try {
+                    var data = JSON.parse(res);
+                    return resolve(data);
+                }
+                catch (err) {
+                    return reject(err);
+                }
+            });
+        }).nodeify(callback);
     }
 
     function validateOptions(options) {
