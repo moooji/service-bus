@@ -40,25 +40,36 @@ function serviceBus(options) {
 
     function publish(data, callback) {
 
-        return zipData(data)
-            .then(function (zippedData) {
+        var bufferHashHex;
+
+        return toBuffer(data)
+            .then(function(buffer) {
+
+                bufferHashHex = md5(buffer);
+                return buffer;
+            })
+            .then(zipBuffer)
+            .then(function (zippedBuffer) {
 
                 return sendMessageAsync({
                     QueueUrl: _pubQueueUrl,
-                    MessageBody: "gzip",
+                    MessageBody: bufferHashHex,
                     DelaySeconds: 0,
                     MessageAttributes: {
                         data: {
                             DataType: "Binary",
-                            BinaryValue: zippedData
+                            BinaryValue: zippedBuffer
                         }
                     }
                 });
             })
             .then(function (message) {
 
-                // TODO: ADD MD5 check
-                return message;
+                if (md5(bufferHashHex) !== message.MD5OfMessageBody) {
+                    throw MessageError("Message body MD5 mismatch")
+                }
+
+                return bufferHashHex;
             })
             .nodeify(callback);
     }
@@ -97,8 +108,6 @@ function serviceBus(options) {
                 _isPolling = false;
 
                 if (data && data.Messages) {
-                    //var messages = parseMessages(data.Messages);
-                    //_subDelegate(messages, next);
 
                     return parseMessages(data.Messages)
                         .then(function(messages) {
@@ -138,7 +147,22 @@ function serviceBus(options) {
                             throw MessageError("Message has invalid payload");
                         }
 
-                        return unzipData(message.MessageAttributes.data.BinaryValue);
+                        if (message.MD5OfBody !== md5(message.Body)) {
+                            throw MessageError("Message body MD5 mismatch")
+                        }
+
+                        return unzipBuffer(message.MessageAttributes.data.BinaryValue)
+                            .then(function(buffer) {
+
+                                var bufferHashHex = md5(buffer);
+
+                                if (bufferHashHex !== message.Body) {
+                                   throw MessageError("Message body MD5 mismatch")
+                                }
+
+                                return buffer;
+                            })
+                            .then(toObject);
                     })
                     .then(function(body) {
 
@@ -152,7 +176,7 @@ function serviceBus(options) {
             }).nodeify(callback);
     }
 
-    function zipData(data, callback) {
+    function toBuffer(data, callback) {
 
         return new Promise(function (resolve, reject) {
 
@@ -160,7 +184,34 @@ function serviceBus(options) {
                 var dataString = JSON.stringify(data);
                 var dataBuffer = new Buffer(dataString);
 
-                zlib.gzip(dataBuffer, function (err, res) {
+                return resolve(dataBuffer);
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }).nodeify(callback);
+    }
+
+    function toObject(buffer, callback) {
+
+        return new Promise(function (resolve, reject) {
+
+            try {
+                var data = JSON.parse(buffer);
+                return resolve(data);
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }).nodeify(callback);
+    }
+
+    function zipBuffer(buffer, callback) {
+
+        return new Promise(function (resolve, reject) {
+
+            try {
+                zlib.gzip(buffer, function (err, res) {
 
                     if (err) {
                         return reject(err);
@@ -175,25 +226,26 @@ function serviceBus(options) {
         }).nodeify(callback);
     }
 
-    function unzipData(zippedData, callback) {
+    function unzipBuffer(zippedBuffer, callback) {
 
         return new Promise(function (resolve, reject) {
 
-            zlib.gunzip(zippedData, function (err, res) {
+            zlib.gunzip(zippedBuffer, function (err, res) {
 
                 if (err) {
                     return reject(err);
                 }
 
-                try {
-                    var data = JSON.parse(res);
-                    return resolve(data);
-                }
-                catch (err) {
-                    return reject(err);
-                }
+                return resolve(res);
             });
         }).nodeify(callback);
+    }
+
+    function md5(data) {
+
+        var hash = crypto.createHash('md5');
+        hash.update(data);
+        return hash.digest('hex');
     }
 
     function validateOptions(options) {
