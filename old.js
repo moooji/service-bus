@@ -1,3 +1,6 @@
+/**
+ * Created by steve on 28/06/15.
+ */
 "use strict";
 
 var crypto = require("crypto");
@@ -10,13 +13,15 @@ var _ = require("lodash");
 var MessageError = createError('MessageError');
 var InvalidArgumentError = createError('InvalidArgumentError');
 
-function serviceBus(queueUrl, options) {
+function serviceBus(options) {
 
-    validate(queueUrl, options);
+    validateOptions(options);
 
-    var _delegate;
     var _isPolling = false;
-    var _queueUrl = queueUrl;
+    var _subDelegate;
+
+    var _pubQueueUrl = options.pubQueueUrl;
+    var _subQueueUrl = options.subQueueUrl;
 
     var _sqs = new AWS.SQS({
         accessKeyId: options.accessKeyId,
@@ -31,7 +36,7 @@ function serviceBus(queueUrl, options) {
     function acknowledge(message, callback) {
 
         return deleteMessageAsync({
-            QueueUrl: _queueUrl,
+            QueueUrl: _subQueueUrl,
             ReceiptHandle: message.receiptHandle
         }).nodeify(callback);
     }
@@ -50,7 +55,7 @@ function serviceBus(queueUrl, options) {
             .then(function (zippedBuffer) {
 
                 return sendMessageAsync({
-                    QueueUrl: _queueUrl,
+                    QueueUrl: _pubQueueUrl,
                     MessageBody: bufferHashHex,
                     DelaySeconds: 0,
                     MessageAttributes: {
@@ -72,15 +77,15 @@ function serviceBus(queueUrl, options) {
             .nodeify(callback);
     }
 
-    function subscribe(delegate, callback) {
+    function subscribe(subDelegate, callback) {
 
         return new Promise(function (resolve, reject) {
 
-            if (!delegate || typeof delegate !== "function") {
-                return reject(new Error("No delegate function provided"));
+            if (!subDelegate || typeof subDelegate !== "function") {
+                return reject(new Error("No subDelegate function provided"));
             }
 
-            _delegate = delegate;
+            _subDelegate = subDelegate;
             next();
 
             return resolve();
@@ -93,7 +98,7 @@ function serviceBus(queueUrl, options) {
         _isPolling = true;
 
         var params = {
-            QueueUrl: _queueUrl,
+            QueueUrl: _subQueueUrl,
             MaxNumberOfMessages: 10,
             VisibilityTimeout: 60,
             WaitTimeSeconds: 10,
@@ -109,7 +114,7 @@ function serviceBus(queueUrl, options) {
 
                     return parseMessages(data.Messages)
                         .then(function(messages) {
-                           _delegate(messages, next);
+                            _subDelegate(messages, next);
                         });
                 }
                 else {
@@ -155,7 +160,7 @@ function serviceBus(queueUrl, options) {
                                 var bufferHashHex = md5(buffer);
 
                                 if (bufferHashHex !== message.Body) {
-                                   throw MessageError("Message body MD5 mismatch")
+                                    throw MessageError("Message body MD5 mismatch")
                                 }
 
                                 return buffer;
@@ -256,11 +261,7 @@ function serviceBus(queueUrl, options) {
             .nodeify(callback);
     }
 
-    function validate(queueUrl, options) {
-
-        if (!_.isString(queueUrl)) {
-            throw InvalidArgumentError("No AWS SQS queue URL provided");
-        }
+    function validateOptions(options) {
 
         if (!options) {
             throw InvalidArgumentError("No options provided");
@@ -276,6 +277,14 @@ function serviceBus(queueUrl, options) {
 
         if (!options.region) {
             throw InvalidArgumentError("No AWS 'region' provided");
+        }
+
+        if (!options.pubQueueUrl) {
+            throw InvalidArgumentError("No AWS SQS 'pubQueueUrl' provided");
+        }
+
+        if (!options.subQueueUrl) {
+            throw InvalidArgumentError("No AWS SQS 'subQueueUrl' provided");
         }
     }
 
