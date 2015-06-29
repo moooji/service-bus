@@ -178,13 +178,15 @@ function serviceBus(queueUrl, options) {
 
         return new Promise(function (resolve, reject) {
 
+            if (!_.isPlainObject(data)) {
+                return reject(new InvalidArgumentError("Input data has to be plain object"));
+            }
+
             try {
 
-                if (_.isPlainObject(data)) {
-                    data = JSON.stringify(data);
-                }
+                var dataString = JSON.stringify(data);
+                var dataBuffer = new Buffer(dataString);
 
-                var dataBuffer = new Buffer(data);
                 return resolve(dataBuffer);
             }
             catch (err) {
