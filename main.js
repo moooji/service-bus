@@ -125,7 +125,6 @@ function serviceBus(queueUrl, options) {
 
     function next() {
 
-        console.log("next %s", _isPolling);
         if (_isPolling) return;
         poll();
     }
@@ -183,7 +182,6 @@ function serviceBus(queueUrl, options) {
             }
 
             try {
-
                 var dataString = JSON.stringify(data);
                 var dataBuffer = new Buffer(dataString);
 
