@@ -10,7 +10,13 @@ var _ = require("lodash");
 var MessageError = createError('MessageError');
 var InvalidArgumentError = createError('InvalidArgumentError');
 
-function serviceBus(queueUrl, options) {
+/**
+ * Service Bus factory
+ * @param {String} queueUrl
+ * @param {Object} options
+ * @returns {Object}
+ */
+function serviceBusFactory(queueUrl, options) {
 
     validate(queueUrl, options);
 
@@ -289,4 +295,4 @@ function serviceBus(queueUrl, options) {
     };
 }
 
-module.exports = serviceBus;
+module.exports = serviceBusFactory;
